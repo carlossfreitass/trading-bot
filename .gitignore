@@ -1,0 +1,37 @@
+# Variáveis de ambiente
+.env
+
+# Estado persistido do bot
+state.json
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+htmlcov/
