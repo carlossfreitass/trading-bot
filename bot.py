@@ -23,10 +23,8 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# Carrega .env
 load_dotenv()
 
-# Mapa de fontes
 _FETCHERS = {
     "twelvedata": twelvedata_fetch,
     "binance":    binance_fetch,
@@ -37,8 +35,13 @@ _SOURCE_LABEL = {
     "binance":    "Binance (Cripto)",
 }
 
+# Duração em segundos de cada intervalo de vela
+_INTERVAL_SECONDS = {
+    "1m": 60, "5m": 300, "15m": 900,
+    "30m": 1800, "1h": 3600, "1d": 86400,
+}
+
 def validar_config() -> tuple[list[str], str, int]:
-    """Valida variáveis obrigatórias e retorna (symbols, interval, check_interval)."""
     faltando = [
         v for v in ("TELEGRAM_TOKEN", "TELEGRAM_CHATID", "TWELVE_DATA_TOKEN")
         if not os.getenv(v)
@@ -46,15 +49,14 @@ def validar_config() -> tuple[list[str], str, int]:
     if faltando:
         raise EnvironmentError(f"Variáveis ausentes no .env: {', '.join(faltando)}")
 
-    symbols    = [s.strip() for s in os.getenv("SYMBOLS", "EURUSD,SOLUSDT").split(",") if s.strip()]
+    symbols    = [s.strip() for s in os.getenv("SYMBOLS", "USDJPY,EURGBP").split(",") if s.strip()]
     interval   = os.getenv("INTERVAL", "1m")
-    check_int  = int(os.getenv("CHECK_INTERVAL", "120"))
+    check_int  = int(os.getenv("CHECK_INTERVAL", "300"))
 
     log.info(f"✅ Config OK | Ativos: {symbols} | Intervalo: {interval} | Check: {check_int}s")
     return symbols, interval, check_int
 
-def processar_simbolo(symbol: str, interval: str) -> None:
-    """Detecta fonte, busca candles, calcula EMAs e dispara alerta se houver sinal."""
+def processar_simbolo(symbol: str, interval: str, check_interval: int) -> None:
     info    = detect(symbol)
     fetcher = _FETCHERS[info["source"]]
 
@@ -66,25 +68,27 @@ def processar_simbolo(symbol: str, interval: str) -> None:
         log.warning(f"[{info['display']}] Sem dados disponíveis.")
         return
 
-    resultado = analyze(df)
+    candle_secs = _INTERVAL_SECONDS.get(interval, 60)
+    resultado   = analyze(df, check_interval=check_interval, candle_seconds=candle_secs)
+
     if resultado is None:
-        log.debug(f"[{info['display']}] Sem confluência nesta vela.")
+        log.debug(f"[{info['display']}] Sem confluência nesta janela.")
         return
 
     sinal = resolve_signal(
         symbol,
         resultado["confluencia_compra"],
         resultado["confluencia_venda"],
+        resultado["candle_ts"],
     )
 
     if sinal:
         log.info(f"[{info['display']}] 🔔 Sinal: {sinal}")
         send(sinal, info["display"], resultado)
     else:
-        log.debug(f"[{info['display']}] Confluência detectada, mas direção não mudou.")
+        log.debug(f"[{info['display']}] Confluência detectada, mas já processada ou direção não mudou.")
 
 def loop(symbols: list[str], interval: str, check_interval: int) -> None:
-    """Loop principal"""
     falhas = 0
     MAX_FALHAS = 10
 
@@ -100,7 +104,7 @@ def loop(symbols: list[str], interval: str, check_interval: int) -> None:
     while True:
         try:
             for symbol in symbols:
-                processar_simbolo(symbol, interval)
+                processar_simbolo(symbol, interval, check_interval)
 
             falhas = 0
             time.sleep(check_interval)

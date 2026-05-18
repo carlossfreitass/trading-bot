@@ -24,9 +24,10 @@ def _crossunder(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de cima para baixo."""
     return (fast < slow) & (fast.shift(1) >= slow.shift(1))
 
-def analyze(df: pd.DataFrame) -> dict | None:
+def analyze(df: pd.DataFrame, check_interval: int = 120, candle_seconds: int = 60) -> dict | None:
     """
-    Recebe DataFrame de candles e verifica a última vela FECHADA.
+    Recebe DataFrame de candles e procura confluência nas últimas
+    velas fechadas, cobrindo todo o período do CHECK_INTERVAL.
     """
     if df is None or len(df) < MIN_BARS:
         qty = len(df) if df is not None else 0
@@ -47,20 +48,34 @@ def analyze(df: pd.DataFrame) -> dict | None:
     up_10_20 = _crossover (ema10, ema20)
     dn_10_20 = _crossunder(ema10, ema20)
 
-    # Última vela FECHADA
-    i = -2
+    # Cobre o período do CHECK_INTERVAL + 2 velas de buffer
+    n_velas = max(2, (check_interval // candle_seconds) + 2)
 
-    confluencia_compra = bool(up_6_40.iloc[i] and up_10_20.iloc[i])
-    confluencia_venda  = bool(dn_6_40.iloc[i] and dn_10_20.iloc[i])
+    # Índices das velas fechadas: ignora a última (-1) que pode estar aberta
+    indices = range(-2, -(n_velas + 2), -1)
 
-    if not confluencia_compra and not confluencia_venda:
-        return None
+    for i in indices:
+        try:
+            confluencia_compra = bool(up_6_40.iloc[i] and up_10_20.iloc[i])
+            confluencia_venda  = bool(dn_6_40.iloc[i] and dn_10_20.iloc[i])
+        except IndexError:
+            break
 
-    return {
-        "confluencia_compra": confluencia_compra,
-        "confluencia_venda":  confluencia_venda,
-        "ema6":  round(float(ema6.iloc[i]),  5),
-        "ema40": round(float(ema40.iloc[i]), 5),
-        "ema10": round(float(ema10.iloc[i]), 5),
-        "ema20": round(float(ema20.iloc[i]), 5),
-    }
+        if not confluencia_compra and not confluencia_venda:
+            continue
+
+        # Encontrou confluência — retorna a mais recente
+        candle_ts = df.index[i]
+        log.debug(f"Confluência encontrada na vela {i} ({candle_ts})")
+
+        return {
+            "confluencia_compra": confluencia_compra,
+            "confluencia_venda":  confluencia_venda,
+            "candle_ts":          candle_ts,
+            "ema6":  round(float(ema6.iloc[i]),  5),
+            "ema40": round(float(ema40.iloc[i]), 5),
+            "ema10": round(float(ema10.iloc[i]), 5),
+            "ema20": round(float(ema20.iloc[i]), 5),
+        }
+
+    return None

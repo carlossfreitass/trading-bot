@@ -29,26 +29,52 @@ _state: dict = _load()
 
 def get_position(symbol: str) -> int:
     """Retorna a posição atual: 0, 1 ou -1."""
-    return _state.get(symbol.upper(), 0)
+    return _state.get(symbol.upper(), {}).get("posicao", 0)
 
-def resolve_signal(symbol: str, confluencia_compra: bool, confluencia_venda: bool) -> str | None:
+def get_last_candle_ts(symbol: str) -> str:
+    """Retorna o timestamp da última vela já processada."""
+    return _state.get(symbol.upper(), {}).get("last_candle_ts", "")
+
+def resolve_signal(
+    symbol: str,
+    confluencia_compra: bool,
+    confluencia_venda: bool,
+    candle_ts,
+) -> str | None:
     """
-    Decide se deve emitir sinal com base na confluência e posição atual.
+    Decide se deve emitir sinal com base na confluência,
+    posição atual e timestamp da vela.
     """
-    sym     = symbol.upper()
-    posicao = get_position(sym)
-    sinal   = None
+    sym         = symbol.upper()
+    posicao     = get_position(sym)
+    last_ts     = get_last_candle_ts(sym)
+    candle_ts_s = str(candle_ts)
+
+    # Ignora vela já processada
+    if candle_ts_s == last_ts:
+        log.debug(f"[{sym}] Vela {candle_ts_s} já processada. Ignorando.")
+        return None
+
+    sinal = None
 
     if confluencia_compra and posicao != 1:
         sinal = "COMPRA"
-        _state[sym] = 1
+        _state[sym] = {"posicao": 1, "last_candle_ts": candle_ts_s}
 
     elif confluencia_venda and posicao != -1:
         sinal = "VENDA"
-        _state[sym] = -1
+        _state[sym] = {"posicao": -1, "last_candle_ts": candle_ts_s}
+
+    else:
+        # Mesma direção — apenas atualiza o timestamp para não re-processar
+        if sym not in _state:
+            _state[sym] = {"posicao": posicao, "last_candle_ts": candle_ts_s}
+        else:
+            _state[sym]["last_candle_ts"] = candle_ts_s
+
+    _save(_state)
 
     if sinal:
-        _save(_state)
-        log.info(f"[{sym}] Posição: {posicao} → {_state[sym]}")
+        log.info(f"[{sym}] Posição: {posicao} → {_state[sym]['posicao']} | Vela: {candle_ts_s}")
 
     return sinal
