@@ -13,8 +13,7 @@ EMA_SLOW1  = 40
 EMA_FAST2 = 10
 EMA_SLOW2  = 20
 
-# Mínimo de velas para calcular todas as EMAs com confiabilidade
-MIN_BARS = EMA_SLOW1 + 10
+MIN_BARS = EMA_SLOW1 + 10  # 50 velas
 
 def _crossover(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de baixo para cima."""
@@ -24,10 +23,11 @@ def _crossunder(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de cima para baixo."""
     return (fast < slow) & (fast.shift(1) >= slow.shift(1))
 
-def analyze(df: pd.DataFrame, check_interval: int = 120, candle_seconds: int = 60) -> dict | None:
+def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     """
-    Recebe DataFrame de candles e procura confluência nas últimas
-    velas fechadas, cobrindo todo o período do CHECK_INTERVAL.
+    Verifica todas as velas FECHADAS novas desde last_candle_ts.
+    Cada vela é verificada individualmente — nunca combina cruzamentos
+    de velas diferentes.
     """
     if df is None or len(df) < MIN_BARS:
         qty = len(df) if df is not None else 0
@@ -48,34 +48,39 @@ def analyze(df: pd.DataFrame, check_interval: int = 120, candle_seconds: int = 6
     up_10_20 = _crossover (ema10, ema20)
     dn_10_20 = _crossunder(ema10, ema20)
 
-    # Cobre o período do CHECK_INTERVAL + 2 velas de buffer
-    n_velas = max(2, (check_interval // candle_seconds) + 2)
+    # Seleciona velas fechadas a verificar
+    velas_fechadas = df.iloc[:-1]
 
-    # Índices das velas fechadas: ignora a última (-1) que pode estar aberta
-    indices = range(-2, -(n_velas + 2), -1)
+    if last_candle_ts is not None:
+        # Filtra apenas velas MAIS NOVAS que o último timestamp processado
+        velas_novas = velas_fechadas[velas_fechadas.index > last_candle_ts]
+    else:
+        # Primeira execução — verifica apenas a penúltima vela
+        velas_novas = velas_fechadas.iloc[[-1]]
 
-    for i in indices:
-        try:
-            confluencia_compra = bool(up_6_40.iloc[i] and up_10_20.iloc[i])
-            confluencia_venda  = bool(dn_6_40.iloc[i] and dn_10_20.iloc[i])
-        except IndexError:
-            break
+    if velas_novas.empty:
+        log.debug("Nenhuma vela nova para verificar.")
+        return None
+
+    # Verifica cada vela nova individualmente
+    for ts in velas_novas.index:
+        pos = df.index.get_loc(ts)
+
+        confluencia_compra = bool(up_6_40.iloc[pos] and up_10_20.iloc[pos])
+        confluencia_venda  = bool(dn_6_40.iloc[pos] and dn_10_20.iloc[pos])
 
         if not confluencia_compra and not confluencia_venda:
             continue
 
-        # Encontrou confluência — retorna a mais recente
-        candle_ts = df.index[i]
-        log.debug(f"Confluência encontrada na vela {i} ({candle_ts})")
-
+        log.debug(f"Confluência encontrada na vela {ts}")
         return {
             "confluencia_compra": confluencia_compra,
             "confluencia_venda":  confluencia_venda,
-            "candle_ts":          candle_ts,
-            "ema6":  round(float(ema6.iloc[i]),  5),
-            "ema40": round(float(ema40.iloc[i]), 5),
-            "ema10": round(float(ema10.iloc[i]), 5),
-            "ema20": round(float(ema20.iloc[i]), 5),
+            "candle_ts":          ts,
+            "ema6":  round(float(ema6.iloc[pos]),  5),
+            "ema40": round(float(ema40.iloc[pos]), 5),
+            "ema10": round(float(ema10.iloc[pos]), 5),
+            "ema20": round(float(ema20.iloc[pos]), 5),
         }
 
     return None
