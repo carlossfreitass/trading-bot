@@ -24,16 +24,18 @@ def _save(state: dict) -> None:
     except Exception as e:
         log.warning(f"Não foi possível salvar state.json: {e}")
 
-# Carregado uma vez na inicialização
 _state: dict = _load()
 
 def get_position(symbol: str) -> int:
     """Retorna a posição atual: 0, 1 ou -1."""
     return _state.get(symbol.upper(), {}).get("posicao", 0)
 
-def get_last_candle_ts(symbol: str) -> str:
-    """Retorna o timestamp da última vela já processada."""
-    return _state.get(symbol.upper(), {}).get("last_candle_ts", "")
+def get_last_candle_ts(symbol: str):
+    """
+    Retorna o timestamp da última vela já processada.
+    """
+    val = _state.get(symbol.upper(), {}).get("last_candle_ts", None)
+    return val
 
 def resolve_signal(
     symbol: str,
@@ -51,7 +53,7 @@ def resolve_signal(
     candle_ts_s = str(candle_ts)
 
     # Ignora vela já processada
-    if candle_ts_s == last_ts:
+    if last_ts is not None and candle_ts_s == last_ts:
         log.debug(f"[{sym}] Vela {candle_ts_s} já processada. Ignorando.")
         return None
 
@@ -66,7 +68,6 @@ def resolve_signal(
         _state[sym] = {"posicao": -1, "last_candle_ts": candle_ts_s}
 
     else:
-        # Mesma direção — apenas atualiza o timestamp para não re-processar
         if sym not in _state:
             _state[sym] = {"posicao": posicao, "last_candle_ts": candle_ts_s}
         else:

@@ -13,7 +13,10 @@ EMA_SLOW1  = 40
 EMA_FAST2 = 10
 EMA_SLOW2  = 20
 
-MIN_BARS = EMA_SLOW1 + 10  # 50 velas
+MIN_BARS = EMA_SLOW1 + 10
+
+# Quantidade de velas a verificar na primeira execução
+LOOKBACK_INICIAL = 10
 
 def _crossover(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de baixo para cima."""
@@ -25,9 +28,7 @@ def _crossunder(fast: pd.Series, slow: pd.Series) -> pd.Series:
 
 def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     """
-    Verifica todas as velas FECHADAS novas desde last_candle_ts.
-    Cada vela é verificada individualmente — nunca combina cruzamentos
-    de velas diferentes.
+    Verifica velas fechadas em busca de confluência.
     """
     if df is None or len(df) < MIN_BARS:
         qty = len(df) if df is not None else 0
@@ -52,18 +53,20 @@ def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     velas_fechadas = df.iloc[:-1]
 
     if last_candle_ts is not None:
-        # Filtra apenas velas MAIS NOVAS que o último timestamp processado
-        velas_novas = velas_fechadas[velas_fechadas.index > last_candle_ts]
+        # Execuções normais
+        velas_a_verificar = velas_fechadas[velas_fechadas.index > last_candle_ts]
+        log.info(f"Verificando {len(velas_a_verificar)} velas novas desde {last_candle_ts}")
     else:
-        # Primeira execução — verifica apenas a penúltima vela
-        velas_novas = velas_fechadas.iloc[[-1]]
+        # Primeira execução
+        velas_a_verificar = velas_fechadas.iloc[-LOOKBACK_INICIAL:]
+        log.info(f"Primeira execução — verificando últimas {len(velas_a_verificar)} velas fechadas")
 
-    if velas_novas.empty:
-        log.debug("Nenhuma vela nova para verificar.")
+    if velas_a_verificar.empty:
+        log.info("Nenhuma vela nova para verificar.")
         return None
 
-    # Verifica cada vela nova individualmente
-    for ts in velas_novas.index:
+    # Verifica cada vela individualmente
+    for ts in velas_a_verificar.index:
         pos = df.index.get_loc(ts)
 
         confluencia_compra = bool(up_6_40.iloc[pos] and up_10_20.iloc[pos])
@@ -72,7 +75,7 @@ def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
         if not confluencia_compra and not confluencia_venda:
             continue
 
-        log.debug(f"Confluência encontrada na vela {ts}")
+        log.info(f"✅ Confluência encontrada na vela {ts}")
         return {
             "confluencia_compra": confluencia_compra,
             "confluencia_venda":  confluencia_venda,
