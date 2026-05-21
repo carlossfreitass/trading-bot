@@ -1,8 +1,6 @@
 import time
 import logging
 import os
-from datetime import datetime, timezone
-
 from dotenv import load_dotenv
 
 from utils.asset_detector      import detect
@@ -85,14 +83,7 @@ def loop(symbols: list[str], interval: str, check_interval: int) -> None:
     falhas = 0
     MAX_FALHAS = 10
 
-    agora = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
     log.info("🚀 Bot iniciado.")
-    send_raw(
-        f"🤖 *Bot de Trading Iniciado*\n"
-        f"Ativos: `{', '.join(symbols)}`\n"
-        f"Intervalo: `{interval}` | Check: `{check_interval}s`\n"
-        f"⏰ `{agora}`"
-    )
 
     while True:
         try:
