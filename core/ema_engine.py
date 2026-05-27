@@ -15,9 +15,6 @@ EMA_SLOW2  = 20
 
 MIN_BARS = EMA_SLOW1 + 10
 
-# Quantidade de velas a verificar na primeira execução
-LOOKBACK_INICIAL = 10
-
 def _crossover(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de baixo para cima."""
     return (fast > slow) & (fast.shift(1) <= slow.shift(1))
@@ -28,7 +25,7 @@ def _crossunder(fast: pd.Series, slow: pd.Series) -> pd.Series:
 
 def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     """
-    Verifica velas fechadas em busca de confluência.
+    Verifica a última vela fechada em busca de confluência.
     """
     if df is None or len(df) < MIN_BARS:
         qty = len(df) if df is not None else 0
@@ -53,13 +50,13 @@ def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     velas_fechadas = df.iloc[:-1]
 
     if last_candle_ts is not None:
-        # Execuções normais
+        # Execuções normais: apenas velas novas desde o último timestamp processado
         velas_a_verificar = velas_fechadas[velas_fechadas.index > last_candle_ts]
-        log.info(f"Verificando {len(velas_a_verificar)} velas novas desde {last_candle_ts}")
     else:
-        # Primeira execução
-        velas_a_verificar = velas_fechadas.iloc[-LOOKBACK_INICIAL:]
-        log.info(f"Primeira execução — verificando últimas {len(velas_a_verificar)} velas fechadas")
+        # Primeira execução ou sem histórico: verifica apenas as duas últimas velas fechadas
+        velas_a_verificar = velas_fechadas.iloc[-2:]
+
+    log.info("Verificando as duas últimas velas fechadas")
 
     if velas_a_verificar.empty:
         log.info("Nenhuma vela nova para verificar.")

@@ -10,12 +10,14 @@ from core.ema_engine           import analyze
 from core.state_manager        import get_last_candle_ts, resolve_signal
 from core.telegram_sender      import send, send_raw
 
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("bot.log", encoding="utf-8"),
+        logging.FileHandler(os.path.join(_BASE_DIR, "bot.log"), encoding="utf-8"),
     ],
 )
 log = logging.getLogger(__name__)
@@ -41,8 +43,8 @@ def validar_config() -> tuple[list[str], str, int]:
         raise EnvironmentError(f"Variáveis ausentes no .env: {', '.join(faltando)}")
 
     symbols   = [s.strip() for s in os.getenv("SYMBOLS", "USDJPY,EURGBP").split(",") if s.strip()]
-    interval  = os.getenv("INTERVAL", "1m")
-    check_int = int(os.getenv("CHECK_INTERVAL", "300"))
+    interval  = os.getenv("INTERVAL", "15m")
+    check_int = int(os.getenv("CHECK_INTERVAL", "900"))
 
     log.info(f"✅ Config OK | Ativos: {symbols} | Intervalo: {interval} | Check: {check_int}s")
     return symbols, interval, check_int

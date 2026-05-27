@@ -3,12 +3,13 @@ Controla o estado de cada símbolo para evitar sinais duplicados consecutivos.
 """
 
 import json
+import os
 import logging
 from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-STATE_FILE = Path("state.json")
+STATE_FILE = Path(os.path.dirname(os.path.abspath(__file__))).parent / "state.json"
 
 def _load() -> dict:
     try:
