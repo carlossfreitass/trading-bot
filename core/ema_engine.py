@@ -1,5 +1,5 @@
 """
-Calcula as 4 EMAs e detecta confluência de cruzamentos.
+Calcula as 4 EMAs, detecta confluência e expõe cruzamentos individuais.
 """
 
 import pandas as pd
@@ -9,11 +9,10 @@ import logging
 log = logging.getLogger(__name__)
 
 EMA_FAST1 = 6
-EMA_SLOW1  = 40
+EMA_SLOW1 = 40
 EMA_FAST2 = 10
-EMA_SLOW2  = 20
-
-MIN_BARS = EMA_SLOW1 + 10
+EMA_SLOW2 = 20
+MIN_BARS  = EMA_SLOW1 + 10
 
 def _crossover(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de baixo para cima."""
@@ -23,14 +22,13 @@ def _crossunder(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """True na vela em que fast cruza slow de cima para baixo."""
     return (fast < slow) & (fast.shift(1) >= slow.shift(1))
 
-def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
+def analyze(df: pd.DataFrame, last_candle_ts=None) -> list[dict]:
     """
-    Verifica a última vela fechada em busca de confluência.
+    Verifica velas fechadas em busca de cruzamentos.
     """
     if df is None or len(df) < MIN_BARS:
-        qty = len(df) if df is not None else 0
-        log.warning(f"Dados insuficientes: {qty} velas (mínimo {MIN_BARS}).")
-        return None
+        log.warning(f"Dados insuficientes: {len(df) if df is not None else 0} velas.")
+        return []
 
     close = df["close"]
 
@@ -40,47 +38,60 @@ def analyze(df: pd.DataFrame, last_candle_ts=None) -> dict | None:
     ema10 = ta_lib.trend.ema_indicator(close, window=EMA_FAST2)
     ema20 = ta_lib.trend.ema_indicator(close, window=EMA_SLOW2)
 
-    # Cruzamentos
-    up_6_40  = _crossover (ema6,  ema40)
+    # Detecta todos os cruzamentos na série histórica inteira de uma só vez
+    up_6_40  = _crossover(ema6,  ema40)
     dn_6_40  = _crossunder(ema6,  ema40)
-    up_10_20 = _crossover (ema10, ema20)
+    up_10_20 = _crossover(ema10, ema20)
     dn_10_20 = _crossunder(ema10, ema20)
 
-    # Seleciona velas fechadas a verificar
+    # Ignora a última vela, pois ela ainda está aberta
     velas_fechadas = df.iloc[:-1]
 
+    # Filtra apenas as velas que não foram analisadas no ciclo anterior
     if last_candle_ts is not None:
-        # Execuções normais: apenas velas novas desde o último timestamp processado
         velas_a_verificar = velas_fechadas[velas_fechadas.index > last_candle_ts]
+        log.info(f"Verificando {len(velas_a_verificar)} velas novas desde {last_candle_ts}")
     else:
-        # Primeira execução ou sem histórico: verifica apenas as duas últimas velas fechadas
         velas_a_verificar = velas_fechadas.iloc[-2:]
-
-    log.info("Verificando as duas últimas velas fechadas")
+        log.info("Verificando as duas últimas velas fechadas")
 
     if velas_a_verificar.empty:
         log.info("Nenhuma vela nova para verificar.")
-        return None
+        return []
 
-    # Verifica cada vela individualmente
+    resultados = []
+
+    # Varre apenas as velas novas buscando ações relevantes
     for ts in velas_a_verificar.index:
         pos = df.index.get_loc(ts)
 
-        confluencia_compra = bool(up_6_40.iloc[pos] and up_10_20.iloc[pos])
-        confluencia_venda  = bool(dn_6_40.iloc[pos] and dn_10_20.iloc[pos])
+        u640  = bool(up_6_40.iloc[pos])
+        d640  = bool(dn_6_40.iloc[pos])
+        u1020 = bool(up_10_20.iloc[pos])
+        d1020 = bool(dn_10_20.iloc[pos])
 
-        if not confluencia_compra and not confluencia_venda:
+        # Só inclui velas com pelo menos um cruzamento ativo
+        if not any([u640, d640, u1020, d1020]):
             continue
 
-        log.info(f"✅ Confluência encontrada na vela {ts}")
-        return {
+        confluencia_compra = u640 and u1020
+        confluencia_venda  = d640 and d1020
+
+        resultados.append({
+            "candle_ts":          ts,
             "confluencia_compra": confluencia_compra,
             "confluencia_venda":  confluencia_venda,
-            "candle_ts":          ts,
+            "up_6_40":            u640,
+            "dn_6_40":            d640,
+            "up_10_20":           u1020,
+            "dn_10_20":           d1020,
             "ema6":  round(float(ema6.iloc[pos]),  5),
             "ema40": round(float(ema40.iloc[pos]), 5),
             "ema10": round(float(ema10.iloc[pos]), 5),
             "ema20": round(float(ema20.iloc[pos]), 5),
-        }
+        })
 
-    return None
+    if resultados:
+        log.info(f"✅ {len(resultados)} vela(s) com cruzamento encontrada(s)")
+
+    return resultados
