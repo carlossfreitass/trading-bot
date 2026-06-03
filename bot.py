@@ -4,11 +4,12 @@ import os
 from dotenv import load_dotenv
 
 from utils.asset_detector      import detect
-from source.twelvedata_source import fetch as twelvedata_fetch
-from source.binance_source    import fetch as binance_fetch
+from source.twelvedata_source  import fetch as twelvedata_fetch
+from source.binance_source     import fetch as binance_fetch
 from core.ema_engine           import analyze
 from core.state_manager        import get_last_candle_ts, resolve_signal
 from core.telegram_sender      import send, send_raw
+from core.sequence_tracker     import process_sequence
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -60,26 +61,42 @@ def processar_simbolo(symbol: str, interval: str) -> None:
         log.warning(f"[{info['display']}] Sem dados disponíveis.")
         return
 
-    # Passa o último timestamp processado para o engine
-    last_ts    = get_last_candle_ts(symbol)
-    resultado  = analyze(df, last_candle_ts=last_ts)
+    last_ts   = get_last_candle_ts(symbol)
+    velas     = analyze(df, last_candle_ts=last_ts)
 
-    if resultado is None:
-        log.debug(f"[{info['display']}] Sem confluência em velas novas.")
+    if not velas:
+        log.debug(f"[{info['display']}] Nenhum cruzamento em velas novas.")
         return
 
-    sinal = resolve_signal(
-        symbol,
-        resultado["confluencia_compra"],
-        resultado["confluencia_venda"],
-        resultado["candle_ts"],
-    )
+    for vela in velas:
+        ts = vela["candle_ts"]
 
-    if sinal:
-        log.info(f"[{info['display']}] 🔔 Sinal: {sinal}")
-        send(sinal, info["display"], resultado)
-    else:
-        log.debug(f"[{info['display']}] Confluência detectada mas direção não mudou.")
+        # Confluência perfeita
+        if vela["confluencia_compra"] or vela["confluencia_venda"]:
+            sinal = resolve_signal(
+                symbol,
+                vela["confluencia_compra"],
+                vela["confluencia_venda"],
+                ts,
+            )
+            if sinal:
+                log.info(f"[{info['display']}] 🔔 Confluência: {sinal}")
+                send(sinal, info["display"], vela)
+
+        # Sequência entre indicadores
+        sinal_seq = process_sequence(
+            symbol,
+            up_10_20=vela["up_10_20"],
+            dn_10_20=vela["dn_10_20"],
+            up_6_40=vela["up_6_40"],
+            dn_6_40=vela["dn_6_40"],
+        )
+        if sinal_seq:
+            log.info(f"[{info['display']}] 🔔 Sequência: {sinal_seq}")
+            send(sinal_seq, info["display"], vela)
+
+        # Atualiza last_candle_ts para não reprocessar esta vela
+        resolve_signal(symbol, False, False, ts)
 
 def loop(symbols: list[str], interval: str, check_interval: int) -> None:
     falhas = 0
