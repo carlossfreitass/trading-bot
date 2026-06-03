@@ -31,6 +31,26 @@ _TEMPLATES = {
         "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
         "⏰ `{hora}`"
     ),
+    "COMPRA_SEQ": (
+        "🟡 *SINAL DE COMPRA (Sequência)*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📈 Sequência altista confirmada!\n"
+        "• Ativo: `{display}`\n"
+        "• EMA 10 cruzou ↑ EMA 20 (linha inferior)\n"
+        "• EMA 6 cruzou ↑ EMA 40 (linha superior)\n"
+        "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
+        "⏰ `{hora}`"
+    ),
+    "VENDA_SEQ": (
+        "🟠 *SINAL DE VENDA (Sequência)*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📉 Sequência baixista confirmada!\n"
+        "• Ativo: `{display}`\n"
+        "• EMA 10 cruzou ↓ EMA 20 (linha inferior)\n"
+        "• EMA 6 cruzou ↓ EMA 40 (linha superior)\n"
+        "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
+        "⏰ `{hora}`"
+    ),
 }
 
 def _hora() -> str:
