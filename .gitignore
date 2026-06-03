@@ -3,6 +3,7 @@
 
 # Estado persistido do bot
 state.json
+sequence_state.json
 
 # Logs
 *.log
