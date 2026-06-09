@@ -14,7 +14,7 @@ _TEMPLATES = {
     "COMPRA": (
         "🟢 *SINAL DE COMPRA*\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "📈 Confluência altista detectada!\n"
+        "📈 Sinal altista detectado!\n"
         "• Ativo: `{display}`\n"
         "• EMA 6 cruzou ↑ EMA 40\n"
         "• EMA 10 cruzou ↑ EMA 20\n"
@@ -24,30 +24,10 @@ _TEMPLATES = {
     "VENDA": (
         "🔴 *SINAL DE VENDA*\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "📉 Confluência baixista detectada!\n"
+        "📉 Sinal baixista detectado!\n"
         "• Ativo: `{display}`\n"
         "• EMA 6 cruzou ↓ EMA 40\n"
         "• EMA 10 cruzou ↓ EMA 20\n"
-        "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
-        "⏰ `{hora}`"
-    ),
-    "COMPRA_SEQ": (
-        "🟡 *SINAL DE COMPRA (Sequência)*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "📈 Sequência altista confirmada!\n"
-        "• Ativo: `{display}`\n"
-        "• EMA 10 cruzou ↑ EMA 20 (linha inferior)\n"
-        "• EMA 6 cruzou ↑ EMA 40 (linha superior)\n"
-        "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
-        "⏰ `{hora}`"
-    ),
-    "VENDA_SEQ": (
-        "🟠 *SINAL DE VENDA (Sequência)*\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "📉 Sequência baixista confirmada!\n"
-        "• Ativo: `{display}`\n"
-        "• EMA 10 cruzou ↓ EMA 20 (linha inferior)\n"
-        "• EMA 6 cruzou ↓ EMA 40 (linha superior)\n"
         "• EMA 6: `{ema6}` | EMA 40: `{ema40}`\n"
         "⏰ `{hora}`"
     ),
