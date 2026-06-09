@@ -13,38 +13,23 @@ BASE_URL = "https://api.twelvedata.com/time_series"
 
 # Mapeamento
 _INTERVAL_MAP = {
-    "1m":  "1min",
-    "5m":  "5min",
-    "15m": "15min",
-    "30m": "30min",
-    "1h":  "1h",
-    "1d":  "1day",
+    "1m": "1min", "5m": "5min", "15m": "15min",
+    "30m": "30min", "1h": "1h", "1d": "1day",
 }
 
 def fetch(symbol: str, interval: str, limit: int = 100) -> pd.DataFrame | None:
-    """
-    Busca candles do par Forex e retorna DataFrame com colunas:
-        open, high, low, close, volume
-    """
     token = os.getenv("TWELVE_DATA_TOKEN", "")
     if not token:
         log.error("TWELVE_DATA_TOKEN não definido no .env")
         return None
 
-    iv = _INTERVAL_MAP.get(interval, "1min")
+    iv = _INTERVAL_MAP.get(interval, "15min")
 
     try:
-        resp = requests.get(
-            BASE_URL,
-            params={
-                "symbol":     symbol,
-                "interval":   iv,
-                "outputsize": limit,
-                "order":      "ASC",
-                "apikey":     token,
-            },
-            timeout=10,
-        )
+        resp = requests.get(BASE_URL, params={
+            "symbol": symbol, "interval": iv,
+            "outputsize": limit, "order": "ASC", "apikey": token,
+        }, timeout=10)
         resp.raise_for_status()
         data = resp.json()
 
@@ -54,21 +39,11 @@ def fetch(symbol: str, interval: str, limit: int = 100) -> pd.DataFrame | None:
 
         values = data.get("values", [])
         if not values:
-            log.warning(f"[TwelveData] Sem dados para {symbol}.")
             return None
 
         df = pd.DataFrame(values)
         df.index = pd.to_datetime(df["datetime"], utc=True)
-        df = df.drop(columns=["datetime"])
-        df = df.rename(columns={
-            "open":   "open",
-            "high":   "high",
-            "low":    "low",
-            "close":  "close",
-            "volume": "volume",
-        })
-
-        df = df.astype(float)
+        df = df.drop(columns=["datetime"]).astype(float)
         return df
 
     except requests.RequestException as e:
