@@ -74,7 +74,6 @@ def processar_simbolo(symbol: str, interval: str) -> None:
 
         # Confluência perfeita
         if is_confluencia:
-            # Sistema 1: Confluência perfeita (Mesma vela)
             sinal = resolve_signal(
                 symbol,
                 vela["confluencia_compra"],

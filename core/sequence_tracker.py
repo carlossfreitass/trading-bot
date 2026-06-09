@@ -45,7 +45,6 @@ def process_sequence(
     dn_10_20: bool,
     up_6_40: bool,
     dn_6_40: bool,
-    current_ts=None,
 ) -> str | None:
     """
     Processa os cruzamentos da vela atual e atualiza o estado da sequência.
