@@ -31,19 +31,32 @@ def get_sequence_state(symbol: str) -> str:
     """Retorna o estado atual da sequência."""
     return _seq_state.get(symbol.upper(), {}).get("estado", "idle")
 
+def reset_sequence(symbol: str) -> None:
+    """Reseta a sequência de um símbolo para idle."""
+    sym = symbol.upper()
+    if sym in _seq_state and _seq_state[sym]["estado"] != "idle":
+        _seq_state[sym] = {"estado": "idle"}
+        _save(_seq_state)
+        log.info(f"[{sym}] Sequência resetada para idle")
+
 def process_sequence(
     symbol: str,
     up_10_20: bool,
     dn_10_20: bool,
     up_6_40: bool,
     dn_6_40: bool,
+    current_ts=None,
 ) -> str | None:
     """
     Processa os cruzamentos da vela atual e atualiza o estado da sequência.
     """
-    sym    = symbol.upper()
-    estado = get_sequence_state(sym)
-    sinal  = None
+    sym = symbol.upper()
+    
+    if sym not in _seq_state:
+        _seq_state[sym] = {"estado": "idle"}
+
+    estado = _seq_state[sym]["estado"]
+    sinal = None
 
     # Linha de baixo aparece nesta vela
     # Reseta qualquer sequência anterior
@@ -64,7 +77,7 @@ def process_sequence(
     if estado == "waiting_up":
         if up_6_40:
             # Verde na linha de cima confirma a sequência
-            sinal = "COMPRA_SEQ"
+            sinal = "COMPRA"
             _seq_state[sym] = {"estado": "idle"}
             log.info(f"[{sym}] ✅ Sequência de COMPRA confirmada")
         elif dn_6_40:
@@ -75,13 +88,13 @@ def process_sequence(
     elif estado == "waiting_down":
         if dn_6_40:
             # Vermelho na linha de cima confirma a sequência
-            sinal = "VENDA_SEQ"
+            sinal = "VENDA"
             _seq_state[sym] = {"estado": "idle"}
             log.info(f"[{sym}] ✅ Sequência de VENDA confirmada")
         elif up_6_40:
             # Verde na linha de cima cancela a sequência
             _seq_state[sym] = {"estado": "idle"}
-            log.info(f"[{sym}] ❌ Sequência cancelada: direção oposta na linha de cima")
+            log.info(f"[{sym}] ❌ Sequência cancelada: direção oposta (verde) na linha de cima")
 
     # Linha de cima aparece sem sequência ativa
     # Ignorada
