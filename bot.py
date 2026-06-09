@@ -9,7 +9,7 @@ from source.binance_source     import fetch as binance_fetch
 from core.ema_engine           import analyze
 from core.state_manager        import get_last_candle_ts, resolve_signal
 from core.telegram_sender      import send, send_raw
-from core.sequence_tracker     import process_sequence
+from core.sequence_tracker     import process_sequence, reset_sequence
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -69,10 +69,12 @@ def processar_simbolo(symbol: str, interval: str) -> None:
         return
 
     for vela in velas:
-        ts = vela["candle_ts"]
+        ts             = vela["candle_ts"]
+        is_confluencia = vela["confluencia_compra"] or vela["confluencia_venda"]
 
         # Confluência perfeita
-        if vela["confluencia_compra"] or vela["confluencia_venda"]:
+        if is_confluencia:
+            # Sistema 1: Confluência perfeita (Mesma vela)
             sinal = resolve_signal(
                 symbol,
                 vela["confluencia_compra"],
@@ -83,20 +85,24 @@ def processar_simbolo(symbol: str, interval: str) -> None:
                 log.info(f"[{info['display']}] 🔔 Confluência: {sinal}")
                 send(sinal, info["display"], vela)
 
-        # Sequência entre indicadores
-        sinal_seq = process_sequence(
-            symbol,
-            up_10_20=vela["up_10_20"],
-            dn_10_20=vela["dn_10_20"],
-            up_6_40=vela["up_6_40"],
-            dn_6_40=vela["dn_6_40"],
-        )
-        if sinal_seq:
-            log.info(f"[{info['display']}] 🔔 Sequência: {sinal_seq}")
-            send(sinal_seq, info["display"], vela)
+            # Limpa a memória da sequência para evitar sinais duplicados
+            reset_sequence(symbol)
 
-        # Atualiza last_candle_ts para não reprocessar esta vela
-        resolve_signal(symbol, False, False, ts)
+        else:
+            # Sequência entre indicadores
+            sinal_seq = process_sequence(
+                symbol,
+                up_10_20=vela["up_10_20"],
+                dn_10_20=vela["dn_10_20"],
+                up_6_40=vela["up_6_40"],
+                dn_6_40=vela["dn_6_40"],
+            )
+            if sinal_seq:
+                log.info(f"[{info['display']}] 🔔 Sequência: {sinal_seq}")
+                send(sinal_seq, info["display"], vela)
+
+            # Atualiza o timestamp no state_manager para não reprocessar esta vela
+            resolve_signal(symbol, False, False, ts)
 
 def loop(symbols: list[str], interval: str, check_interval: int) -> None:
     falhas = 0
