@@ -129,6 +129,7 @@ def loop(symbols: list[str], interval: str, check_interval: int) -> None:
         try:
             for symbol in symbols:
                 processar_simbolo(symbol, interval)
+                time.sleep(2)
             falhas = 0
             time.sleep(check_interval)
 
