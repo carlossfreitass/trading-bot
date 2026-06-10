@@ -77,6 +77,14 @@ def analyze(df: pd.DataFrame, last_candle_ts=None) -> list[dict]:
         confluencia_compra = u640 and u1020
         confluencia_venda  = d640 and d1020
 
+        # Log detalhado por vela
+        log.info(
+            f"Vela {ts} | "
+            f"up_6_40={u640} dn_6_40={d640} | "
+            f"up_10_20={u1020} dn_10_20={d1020} | "
+            f"confluencia_compra={confluencia_compra} confluencia_venda={confluencia_venda}"
+        )
+
         resultados.append({
             "candle_ts":          ts,
             "confluencia_compra": confluencia_compra,
