@@ -30,12 +30,30 @@ def _get_tv_client():
     if _tv_instance is None:
         username = os.getenv("TV_USERNAME", "")
         password = os.getenv("TV_PASSWORD", "")
-        if username and password:
-            log.info("Conectando ao TradingView usando conta autenticada.")
-            _tv_instance = TvDatafeed(username, password)
-        else:
-            log.info("Conectando ao TradingView no modo anônimo (nologin).")
-            _tv_instance = TvDatafeed()
+
+        try:
+            if username and password:
+                log.info("Conectando ao TradingView usando conta autenticada.")
+                _tv_instance = TvDatafeed(username, password)
+            else:
+                log.info("Conectando ao TradingView no modo anônimo.")
+                _tv_instance = TvDatafeed()
+
+        except Exception as e:
+            log.warning(
+                f"[TVDatafeed] Falha ao inicializar cliente TradingView: {e}"
+            )
+
+            try:
+                log.info("Tentando reconectar em modo anônimo.")
+                _tv_instance = TvDatafeed()
+            except Exception as e2:
+                log.error(
+                    f"[TVDatafeed] Não foi possível criar cliente TradingView: {e2}",
+                    exc_info=True
+                )
+                return None
+
     return _tv_instance
 
 def _discover_exchange_and_symbol(symbol: str) -> tuple[str, str]:
@@ -52,6 +70,11 @@ def _discover_exchange_and_symbol(symbol: str) -> tuple[str, str]:
 def fetch(symbol: str, interval: str, limit: int = 100) -> pd.DataFrame | None:
     """Busca dados históricos diretamente do TradingView."""
     tv = _get_tv_client()
+
+    if tv is None:
+        log.error("[TVDatafeed] Cliente TradingView indisponível.")
+        return None
+
     tv_interval = _INTERVAL_MAP.get(interval)
 
     if not tv_interval:
