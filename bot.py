@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from utils.asset_detector      import detect
 from source.twelvedata_source  import fetch as twelvedata_fetch
 from source.binance_source     import fetch as binance_fetch
+from source.tvdatafeed_source  import fetch as tvdatafeed_fetch
 from core.ema_engine           import analyze
 from core.state_manager        import get_last_candle_ts, resolve_signal
 from core.telegram_sender      import send, send_raw
@@ -28,37 +29,52 @@ load_dotenv()
 _FETCHERS = {
     "twelvedata": twelvedata_fetch,
     "binance":    binance_fetch,
-}
-
-_SOURCE_LABEL = {
-    "twelvedata": "Twelve Data (Forex)",
-    "binance":    "Binance (Cripto)",
+    "tvdatafeed": tvdatafeed_fetch,
 }
 
 def validar_config() -> tuple[list[str], str, int]:
-    faltando = [
-        v for v in ("TELEGRAM_TOKEN", "TELEGRAM_CHATID", "TWELVE_DATA_TOKEN")
-        if not os.getenv(v)
-    ]
+    obrigatorias = ["TELEGRAM_TOKEN", "TELEGRAM_CHATID"]
+
+    forex_source = os.getenv("FOREX_SOURCE", "twelvedata").lower()
+    if forex_source == "twelvedata":
+        obrigatorias.append("TWELVE_DATA_TOKEN")
+
+    faltando = [v for v in obrigatorias if not os.getenv(v)]
     if faltando:
         raise EnvironmentError(f"Variáveis ausentes no .env: {', '.join(faltando)}")
 
-    symbols   = [s.strip() for s in os.getenv("SYMBOLS", "USDJPY,EURGBP").split(",") if s.strip()]
-    interval  = os.getenv("INTERVAL", "15m")
+    symbols = [s.strip() for s in os.getenv("SYMBOLS", "USDJPY,EURGBP").split(",") if s.strip()]
+    interval = os.getenv("INTERVAL", "15m")
     check_int = int(os.getenv("CHECK_INTERVAL", "900"))
 
     log.info(f"✅ Config OK | Ativos: {symbols} | Intervalo: {interval} | Check: {check_int}s")
     return symbols, interval, check_int
 
 def processar_simbolo(symbol: str, interval: str) -> None:
-    info    = detect(symbol)
-    fetcher = _FETCHERS[info["source"]]
+    info = detect(symbol)
+    if not info:
+        log.warning(f"Não foi possível detectar o tipo de ativo para: {symbol}")
+        return
 
-    log.info(f"[{info['display']}] Buscando dados via {_SOURCE_LABEL[info['source']]}...")
+    # Roteamento Dinâmico
+    fonte_definida = info["source"]
 
-    df = fetcher(info["symbol"], interval, limit=100)
-    if df is None:
-        log.warning(f"[{info['display']}] Sem dados disponíveis.")
+    if fonte_definida == "twelvedata":
+        escolha_usuario = os.getenv("FOREX_SOURCE", "twelvedata").lower()
+    elif fonte_definida == "binance":
+        escolha_usuario = os.getenv("CRYPTO_SOURCE", "binance").lower()
+    else:
+        escolha_usuario = fonte_definida
+
+    if escolha_usuario in _FETCHERS:
+        coletor_selecionado = _FETCHERS[escolha_usuario]
+        log.debug(f"[{symbol}] Roteado dinamicamente para o provedor: {escolha_usuario}")
+    else:
+        coletor_selecionado = _FETCHERS[fonte_definida]
+        log.warning(f"Provedor '{escolha_usuario}' inválido. Utilizando padrão: {fonte_definida}")
+
+    df = coletor_selecionado(info["symbol"], interval, limit=100)
+    if df is None or df.empty:
         return
 
     last_ts   = get_last_candle_ts(symbol)
