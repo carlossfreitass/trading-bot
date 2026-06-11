@@ -104,6 +104,9 @@ def processar_simbolo(symbol: str, interval: str) -> None:
             reset_sequence(symbol)
 
         else:
+            # Atualiza o timestamp no state_manager para não reprocessar esta vela
+            resolve_signal(symbol, False, False, ts)
+
             # Sequência entre indicadores
             sinal_seq = process_sequence(
                 symbol,
@@ -115,9 +118,6 @@ def processar_simbolo(symbol: str, interval: str) -> None:
             if sinal_seq:
                 log.info(f"[{info['display']}] 🔔 Sequência: {sinal_seq}")
                 send(sinal_seq, info["display"], vela)
-
-            # Atualiza o timestamp no state_manager para não reprocessar esta vela
-            resolve_signal(symbol, False, False, ts)
 
 def loop(symbols: list[str], interval: str, check_interval: int) -> None:
     falhas = 0
