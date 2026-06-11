@@ -50,12 +50,11 @@ def process_sequence(
     Processa os cruzamentos da vela atual e atualiza o estado da sequência.
     """
     sym = symbol.upper()
-    
+
     if sym not in _seq_state:
         _seq_state[sym] = {"estado": "idle"}
 
-    estado = _seq_state[sym]["estado"]
-    sinal = None
+    estado_antes = _seq_state[sym]["estado"]
 
     # Linha de baixo aparece nesta vela
     # Reseta qualquer sequência anterior
@@ -63,17 +62,21 @@ def process_sequence(
         # Triângulo verde na linha de baixo
         _seq_state[sym] = {"estado": "waiting_up"}
         log.info(f"[{sym}] Sequência iniciada: aguardando verde na linha de cima")
-        estado = "waiting_up"
+        _save(_seq_state)
+        return None
 
-    elif dn_10_20:
+    if dn_10_20:
         # Triângulo vermelho na linha de baixo
         _seq_state[sym] = {"estado": "waiting_down"}
         log.info(f"[{sym}] Sequência iniciada: aguardando vermelho na linha de cima")
-        estado = "waiting_down"
+        _save(_seq_state)
+        return None
+
+    sinal = None
 
     # Linha de cima aparece nesta vela
     # Só é processada se já houver sequência ativa
-    if estado == "waiting_up":
+    if estado_antes == "waiting_up":
         if up_6_40:
             # Verde na linha de cima confirma a sequência
             sinal = "COMPRA"
@@ -84,7 +87,7 @@ def process_sequence(
             _seq_state[sym] = {"estado": "idle"}
             log.info(f"[{sym}] ❌ Sequência cancelada: direção oposta na linha de cima")
 
-    elif estado == "waiting_down":
+    elif estado_antes == "waiting_down":
         if dn_6_40:
             # Vermelho na linha de cima confirma a sequência
             sinal = "VENDA"
@@ -93,7 +96,7 @@ def process_sequence(
         elif up_6_40:
             # Verde na linha de cima cancela a sequência
             _seq_state[sym] = {"estado": "idle"}
-            log.info(f"[{sym}] ❌ Sequência cancelada: direção oposta (verde) na linha de cima")
+            log.info(f"[{sym}] ❌ Sequência cancelada: direção oposta na linha de cima")
 
     # Linha de cima aparece sem sequência ativa
     # Ignorada
