@@ -96,7 +96,14 @@ def fetch(symbol: str, interval: str, limit: int = 100) -> pd.DataFrame | None:
             log.warning(f"[TVDatafeed] Nenhum dado retornado para {exchange}:{clean_symbol}")
             return None
 
-        df.index = pd.to_datetime(df.index)
+        # Normaliza o índice para UTC
+        idx = pd.to_datetime(df.index)
+        if idx.tz is None:
+            idx = idx.tz_localize("UTC")
+        else:
+            idx = idx.tz_convert("UTC")
+
+        df.index = idx
         df = df.rename(columns={
             "open": "open", "high": "high", "low": "low", "close": "close", "volume": "volume"
         })
