@@ -60,6 +60,10 @@ def _discover_exchange_and_symbol(symbol: str) -> tuple[str, str]:
     """Limpa o símbolo e define a melhor exchange padrão do TradingView."""
     clean = symbol.upper().replace("/", "").replace("-", "").replace("_", "").strip()
 
+    # Metais (Ouro, Prata) -> OANDA é a principal para metais no TV
+    if clean.startswith("XAU") or clean.startswith("XAG"):
+        return "OANDA", clean
+
     # Forex
     if len(clean) == 6 and clean.isalpha():
         return "FX_IDC", clean

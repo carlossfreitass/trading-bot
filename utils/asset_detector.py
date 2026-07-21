@@ -10,6 +10,9 @@ _FIAT = {
     "ZAR", "TRY", "BRL", "CNY", "INR", "KRW", "PLN",
 }
 
+# Metais preciosos (Ouro, Prata)
+_METALS = {"XAU", "XAG"}
+
 # Sufixos de cotação cripto
 _CRYPTO_QUOTES = ("USDT", "USDC", "BUSD", "USD", "BTC", "ETH", "BNB")
 
@@ -23,10 +26,11 @@ def detect(symbol: str) -> dict:
     """
     c = _clean(symbol)
 
-    # Forex
+    # Forex e Metais
     if len(c) == 6 and c.isalpha():
         base, quote = c[:3], c[3:]
-        if base in _FIAT and quote in _FIAT:
+        # Verifica se a base é Fiat ou Metal, e a cotação é Fiat
+        if (base in _FIAT or base in _METALS) and quote in _FIAT:
             fmt = f"{base}/{quote}"
             return {"source": "twelvedata", "symbol": fmt, "display": fmt}
 
